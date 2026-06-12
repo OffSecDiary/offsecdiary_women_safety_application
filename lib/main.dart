@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
+import 'firebase_options.dart';
 import 'core/theme/theme.dart';
 import 'screens/splash.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const WomenSafetyApp());
 }
 
@@ -16,13 +23,9 @@ class WomenSafetyApp extends StatelessWidget {
     return MaterialApp(
       title: "Women Safety Application",
       debugShowCheckedModeBanner: false,
-
-      // Theme setup
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
-
-      // Start screen
       home: const SplashScreen(),
     );
   }

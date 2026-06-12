@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "826464040168",
+    "project_id": "offsecdairy-wsa",
+    "storage_bucket": "offsecdairy-wsa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:826464040168:android:8f98387a42ff5cfbdb055d",
+        "android_client_info": {
+          "package_name": "com.example.women_safety_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxlMfSIJN2hNvtw0OTECFsOCwxonO-Kmg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

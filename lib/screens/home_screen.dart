@@ -132,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: AppTheme.primaryRed,
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryRed.withOpacity(0.5),
+              color: AppTheme.primaryRed.withValues(alpha: 0.5),
               blurRadius: 30,
               spreadRadius: 10,
             ),

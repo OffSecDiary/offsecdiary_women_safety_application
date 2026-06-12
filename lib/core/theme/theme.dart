@@ -124,9 +124,9 @@ class AppTheme {
     ),
 
     switchTheme: SwitchThemeData(
-      thumbColor: MaterialStateProperty.all(primaryRed),
-      trackColor: MaterialStateProperty.all(
-        primaryRed.withOpacity(0.5),
+      thumbColor: WidgetStateProperty.all(primaryRed),
+      trackColor: WidgetStateProperty.all(
+        primaryRed.withValues(alpha: 0.5),
       ),
     ),
 
