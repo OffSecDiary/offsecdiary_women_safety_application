@@ -3,7 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/theme.dart';
-import 'screens/splash.dart';
+
+// Import Screens
+import 'screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,10 +25,13 @@ class WomenSafetyApp extends StatelessWidget {
     return MaterialApp(
       title: "Women Safety Application",
       debugShowCheckedModeBanner: false,
+
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
-      home: const SplashScreen(),
+
+      // Open Login Screen directly
+      home: const LoginScreen(),
     );
   }
 }
