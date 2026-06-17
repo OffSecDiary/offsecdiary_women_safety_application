@@ -11,7 +11,6 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-
   final nameController = TextEditingController();
 
   final emailController = TextEditingController();
@@ -25,25 +24,31 @@ class _SignupScreenState extends State<SignupScreen> {
   bool isLoading = false;
 
   Future<void> signup() async {
+    if (nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter your name"),
+        ),
+      );
+      return;
+    }
 
     if (passwordController.text != confirmPasswordController.text) {
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Passwords do not match"),
         ),
       );
-
       return;
     }
 
     try {
-
       setState(() {
         isLoading = true;
       });
 
       await authService.signUp(
+        name: nameController.text.trim(),
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
@@ -62,39 +67,42 @@ class _SignupScreenState extends State<SignupScreen> {
           builder: (_) => const HomeScreen(),
         ),
       );
-
     } catch (e) {
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(
+            e.toString(),
+          ),
         ),
       );
-
     }
 
-    setState(() {
-      isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
       appBar: AppBar(
         title: const Text("Create Account"),
       ),
-
       body: SingleChildScrollView(
-
         padding: const EdgeInsets.all(20),
-
         child: Column(
-
           children: [
-
             const SizedBox(height: 40),
 
             TextField(
@@ -108,6 +116,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
             TextField(
               controller: emailController,
+              keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: "Email",
               ),
@@ -136,28 +145,17 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 40),
 
             SizedBox(
-
               width: double.infinity,
-
               child: ElevatedButton(
-
                 onPressed: isLoading ? null : signup,
-
                 child: isLoading
                     ? const CircularProgressIndicator()
                     : const Text("CREATE ACCOUNT"),
-
               ),
-
             ),
-
           ],
-
         ),
-
       ),
-
     );
-
   }
 }

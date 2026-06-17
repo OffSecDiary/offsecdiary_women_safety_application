@@ -14,6 +14,7 @@ import 'motion_detection.dart';
 import 'profile.dart';
 import 'settings.dart';
 import 'sos.dart';
+import 'sos_history_screen.dart';
 import 'voice_mode.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -248,6 +249,19 @@ class _HomeScreenState extends State<HomeScreen> {
             AppUtils.navigateTo(
               context,
               SettingsScreen(),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        EmergencyCard(
+          title: "SOS History",
+          subtitle: "View previous emergency alerts",
+          icon: Icons.history,
+          iconColor: Colors.orange,
+          onTap: () {
+            AppUtils.navigateTo(
+              context,
+              const SOSHistoryScreen(),
             );
           },
         ),

@@ -1,7 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../core/theme/theme.dart';
+import '../services/location_service.dart';
 import '../widgets/custom_button.dart';
 
 class SOSScreen extends StatefulWidget {
@@ -16,6 +20,8 @@ class _SOSScreenState extends State<SOSScreen> {
   Timer? timer;
   bool alertSent = false;
 
+  final LocationService _locationService = LocationService();
+
   @override
   void initState() {
     super.initState();
@@ -23,18 +29,67 @@ class _SOSScreenState extends State<SOSScreen> {
   }
 
   void _startCountdown() {
-    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (countdown == 0) {
-        timer.cancel();
-        setState(() {
-          alertSent = true;
-        });
-      } else {
-        setState(() {
-          countdown--;
-        });
-      }
-    });
+    timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (timer) {
+        if (countdown == 0) {
+          timer.cancel();
+          _saveSOSEvent();
+        } else {
+          setState(() {
+            countdown--;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _saveSOSEvent() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) return;
+
+      final position =
+          await _locationService.getCurrentLocation();
+
+      final contactsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('contacts')
+              .get();
+
+      final contactsCount =
+          contactsSnapshot.docs.length;
+
+      await FirebaseFirestore.instance
+          .collection('sos_history')
+          .add({
+        'userId': user.uid,
+        'latitude': position?.latitude,
+        'longitude': position?.longitude,
+        'contactsCount': contactsCount,
+        'status': 'SOS Sent',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        alertSent = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "SOS Sent to $contactsCount Emergency Contacts",
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint("SOS Error: $e");
+    }
   }
 
   void _cancelSOS() {
@@ -60,6 +115,7 @@ class _SOSScreenState extends State<SOSScreen> {
         child: Column(
           children: [
             const SizedBox(height: 30),
+
             Container(
               height: 220,
               width: 220,
@@ -72,27 +128,47 @@ class _SOSScreenState extends State<SOSScreen> {
               child: Center(
                 child: alertSent
                     ? const Icon(
-                  Icons.check,
-                  size: 80,
-                  color: Colors.white,
-                )
+                        Icons.check,
+                        size: 80,
+                        color: Colors.white,
+                      )
                     : Text(
-                  "$countdown",
-                  style: const TextStyle(
-                    fontSize: 72,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                        "$countdown",
+                        style: const TextStyle(
+                          fontSize: 72,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
+
             const SizedBox(height: 30),
+
             Text(
               alertSent
                   ? "Emergency Alert Sent"
                   : "Sending in $countdown seconds...",
-              style: const TextStyle(fontSize: 22),
+              style: const TextStyle(
+                fontSize: 22,
+                color: Colors.white,
+              ),
             ),
+
+            const SizedBox(height: 15),
+
+            if (alertSent)
+              const Text(
+                "Location recorded and emergency contacts identified.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 16,
+                ),
+              ),
+
             const Spacer(),
+
             if (!alertSent)
               CustomButton(
                 text: "Cancel SOS",

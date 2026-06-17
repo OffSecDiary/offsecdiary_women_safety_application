@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../core/theme/theme.dart';
 import '../core/utils/utils.dart';
@@ -9,20 +10,79 @@ class VoiceModeScreen extends StatefulWidget {
   const VoiceModeScreen({super.key});
 
   @override
-  State<VoiceModeScreen> createState() =>
-      _VoiceModeScreenState();
+  State<VoiceModeScreen> createState() => _VoiceModeScreenState();
 }
 
 class _VoiceModeScreenState extends State<VoiceModeScreen> {
-  bool isListening = false;
-  String transcript =
-      "Someone is following me near Pune station.";
-  String threatLevel = "High";
+  final stt.SpeechToText speech = stt.SpeechToText();
 
-  void _toggleListening() {
-    setState(() {
-      isListening = !isListening;
-    });
+  bool isListening = false;
+
+  String transcript = "Tap the microphone and speak.";
+
+  String threatLevel = "Safe";
+
+  Future<void> _toggleListening() async {
+    if (!isListening) {
+      bool available = await speech.initialize();
+
+      if (!mounted) return;
+
+      if (available) {
+        setState(() {
+          isListening = true;
+        });
+
+        speech.listen(
+          onResult: (result) {
+            setState(() {
+              transcript = result.recognizedWords;
+            });
+
+            _analyzeThreat(transcript);
+          },
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Speech recognition unavailable"),
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        isListening = false;
+      });
+
+      speech.stop();
+    }
+  }
+
+  void _analyzeThreat(String text) {
+    final lowerText = text.toLowerCase();
+
+    if (lowerText.contains("help") ||
+        lowerText.contains("emergency") ||
+        lowerText.contains("save me") ||
+        lowerText.contains("danger") ||
+        lowerText.contains("someone is following me")) {
+      setState(() {
+        threatLevel = "High";
+      });
+
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return;
+
+        AppUtils.navigateTo(
+          context,
+          const SOSScreen(),
+        );
+      });
+    } else {
+      setState(() {
+        threatLevel = "Low";
+      });
+    }
   }
 
   void _goToSOS() {
@@ -30,6 +90,12 @@ class _VoiceModeScreenState extends State<VoiceModeScreen> {
       context,
       const SOSScreen(),
     );
+  }
+
+  @override
+  void dispose() {
+    speech.stop();
+    super.dispose();
   }
 
   @override
@@ -44,6 +110,7 @@ class _VoiceModeScreenState extends State<VoiceModeScreen> {
         child: Column(
           children: [
             const SizedBox(height: 30),
+
             GestureDetector(
               onTap: _toggleListening,
               child: CircleAvatar(
@@ -58,21 +125,35 @@ class _VoiceModeScreenState extends State<VoiceModeScreen> {
                 ),
               ),
             ),
+
             const SizedBox(height: 20),
+
             Text(
               isListening
                   ? "Listening..."
                   : "Tap mic to start",
-              style: const TextStyle(fontSize: 20),
+              style: const TextStyle(
+                fontSize: 20,
+                color: Colors.white,
+              ),
             ),
+
             const SizedBox(height: 30),
+
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(transcript),
+                child: Text(
+                  transcript,
+                  style: const TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ),
+
             const SizedBox(height: 20),
+
             Card(
               child: ListTile(
                 leading: const Icon(Icons.warning),
@@ -80,7 +161,9 @@ class _VoiceModeScreenState extends State<VoiceModeScreen> {
                 subtitle: Text(threatLevel),
               ),
             ),
+
             const Spacer(),
+
             CustomButton(
               text: "Escalate to SOS",
               icon: Icons.warning,
