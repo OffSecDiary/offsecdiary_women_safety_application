@@ -1,194 +1,214 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-import '../core/theme/theme.dart';
-import '../core/utils/utils.dart';
-import '../widgets/custom_button.dart';
-import '../widgets/emergency_card.dart';
-import 'sos.dart';
+import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'face_monitoring_history.dart';
 
 class FaceDetectionScreen extends StatefulWidget {
   const FaceDetectionScreen({super.key});
 
   @override
-  State<FaceDetectionScreen> createState() =>
+ State<FaceDetectionScreen> createState() =>
       _FaceDetectionScreenState();
 }
 
-class _FaceDetectionScreenState
-    extends State<FaceDetectionScreen> {
-  bool fearDetected = false;
-  bool isAnalyzing = false;
+class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
+  CameraController? _controller;
 
-  Future<void> _startFaceAnalysis() async {
-    setState(() {
-      isAnalyzing = true;
-    });
+  bool isLoading = true;
+  bool isMonitoring = false;
 
-    await Future.delayed(const Duration(seconds: 2));
+  int monitoringCount = 0;
 
-    if (!mounted) return;
+  Timer? monitoringTimer;
 
-    setState(() {
-      isAnalyzing = false;
-      fearDetected = true;
-    });
-
-    _showSafetyDialog();
+  @override
+  void initState() {
+    super.initState();
+    _initializeCamera();
   }
 
-  void _showSafetyDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.cardBackground,
-        title: const Text(
-          "Stress Detected",
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          "Fear micro-expression detected.\nAre you safe right now?",
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
+  Future<void> _initializeCamera() async {
+    try {
+      final cameras = await availableCameras();
 
-              AppUtils.showSnackBar(
-  context,
-  "...",
-);
+      if (cameras.isEmpty) {
+        return;
+      }
 
-              setState(() {
-                fearDetected = false;
-              });
-            },
-            child: const Text(
-              "I AM SAFE",
-              style: TextStyle(color: Colors.green),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              AppUtils.navigateTo(
-                context,
-                const SOSScreen(),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryRed,
-            ),
-            child: const Text("SEND HELP"),
-          ),
-        ],
-      ),
+      _controller = CameraController(
+        cameras.first,
+        ResolutionPreset.medium,
+      );
+
+      await _controller!.initialize();
+
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Camera Error: $e");
+    }
+  }
+
+  void _startMonitoring() {
+    if (isMonitoring) return;
+
+    setState(() {
+      isMonitoring = true;
+      monitoringCount = 0;
+    });
+
+    _saveMonitoringEvent();
+
+    monitoringTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _saveMonitoringEvent(),
     );
   }
 
-  Widget _buildCameraPreview() {
-    return Container(
-      height: 300,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppTheme.primaryRed.withValues(alpha: 0.4),
-        ),
-      ),
-      child: Center(
-        child: isAnalyzing
-            ? Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            CircularProgressIndicator(
-              color: AppTheme.primaryRed,
+  void _stopMonitoring() {
+    monitoringTimer?.cancel();
+
+    setState(() {
+      isMonitoring = false;
+    });
+  }
+
+  Future<void> _saveMonitoringEvent() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      await FirebaseFirestore.instance
+          .collection("face_monitoring")
+          .add({
+        "userId": user?.uid,
+        "status": "Monitoring Active",
+        "timestamp": FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        monitoringCount++;
+      });
+    } catch (e) {
+      debugPrint("Firestore Error: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    monitoringTimer?.cancel();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Widget _buildStatusCard() {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(
+              isMonitoring
+                  ? Icons.verified_user
+                  : Icons.pause_circle,
+              size: 55,
+              color: isMonitoring
+                  ? Colors.green
+                  : Colors.grey,
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 10),
             Text(
-              "Analyzing face...",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
+              isMonitoring
+                  ? "Monitoring Active"
+                  : "Monitoring Stopped",
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              "Events Logged : $monitoringCount",
+              style: const TextStyle(fontSize: 18),
+            ),
           ],
-        )
-            : const Icon(
-          Icons.camera_alt,
-          color: Colors.grey,
-          size: 80,
         ),
       ),
     );
   }
 
-  Widget _buildAnalysisCard() {
-    return EmergencyCard(
-      title: "Face Stress Analysis",
-      subtitle: fearDetected
-          ? "Fear micro-expression detected"
-          : "No distress signals",
-      icon: Icons.face,
-      iconColor: fearDetected
-          ? AppTheme.primaryRed
-          : AppTheme.safeGreen,
-    );
-  }
-
-  Widget _buildDangerAction() {
-    return Column(
-      children: [
-        const Text(
-          "Silent face safety check",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+  Widget _buildControlButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: SizedBox(
+        width: double.infinity,
+        height: 55,
+        child: ElevatedButton.icon(
+          icon: Icon(
+            isMonitoring
+                ? Icons.stop
+                : Icons.play_arrow,
           ),
+          label: Text(
+            isMonitoring
+                ? "STOP MONITORING"
+                : "START MONITORING",
+          ),
+          onPressed: isMonitoring
+              ? _stopMonitoring
+              : _startMonitoring,
         ),
-        const SizedBox(height: 20),
-        CustomButton(
-          text: isAnalyzing
-              ? "ANALYZING..."
-              : "START FACE ANALYSIS",
-          icon: Icons.face_retouching_natural,
-
-          onPressed: isAnalyzing
-              ? null
-              : () {
-            _startFaceAnalysis();
-          },
-
-        ),
-      ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
       appBar: AppBar(
-        title: const Text("Silent Face Detection"),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              _buildCameraPreview(),
-              const SizedBox(height: 24),
-              _buildAnalysisCard(),
-              const SizedBox(height: 30),
-              _buildDangerAction(),
-              const SizedBox(height: 20),
-            ],
+        title: const Text("Face Monitoring"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: "Monitoring History",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const FaceMonitoringHistoryScreen(),
+                ),
+              );
+            },
           ),
-        ),
+        ],
       ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : Column(
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: CameraPreview(_controller!),
+                ),
+                const SizedBox(height: 16),
+                _buildStatusCard(),
+                const SizedBox(height: 20),
+                _buildControlButton(),
+                const SizedBox(height: 25),
+              ],
+            ),
     );
   }
 }

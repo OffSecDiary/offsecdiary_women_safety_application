@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import 'sos.dart';
 import '../widgets/custom_button.dart';
@@ -18,45 +21,83 @@ class _MotionDetectionScreenState
     extends State<MotionDetectionScreen> {
   bool isMonitoring = false;
   bool dangerDetected = false;
+
   double sensitivity = 0.7;
+
   String motionStatus = "No unusual movement";
 
-  Timer? _demoTimer;
+  double motionScore = 0.0;
+
+  StreamSubscription? _accelerometerSubscription;
+
+  bool _dialogShowing = false;
 
   void _toggleMonitoring() {
-    setState(() {
-      isMonitoring = !isMonitoring;
-      dangerDetected = false;
-      motionStatus = isMonitoring
-          ? "Monitoring movement..."
-          : "No unusual movement";
-    });
-
     if (isMonitoring) {
-      _startDemoMotionSimulation();
+      _stopMonitoring();
     } else {
-      _demoTimer?.cancel();
+      _startMonitoring();
     }
   }
 
-  void _startDemoMotionSimulation() {
-    _demoTimer?.cancel();
+  void _startMonitoring() {
+    setState(() {
+      isMonitoring = true;
+      dangerDetected = false;
+      motionStatus = "Monitoring movement...";
+    });
 
-    _demoTimer = Timer(const Duration(seconds: 4), () {
-      if (!mounted || !isMonitoring) return;
+    _accelerometerSubscription =
+        accelerometerEventStream().listen((event) {
+      if (!mounted) return;
+
+      final magnitude = sqrt(
+        event.x * event.x +
+            event.y * event.y +
+            event.z * event.z,
+      );
 
       setState(() {
-        dangerDetected = true;
-        motionStatus = "Panic running detected";
+        motionScore = magnitude;
       });
 
-      _showDangerPrompt();
+      double threshold = 18 - (sensitivity * 8);
+
+      if (magnitude > threshold &&
+          !_dialogShowing &&
+          isMonitoring) {
+        setState(() {
+          dangerDetected = true;
+          motionStatus = "Sudden movement detected";
+        });
+
+        _showDangerPrompt();
+      } else if (!dangerDetected) {
+        setState(() {
+          motionStatus =
+          "Monitoring... Motion ${magnitude.toStringAsFixed(1)}";
+        });
+      }
+    });
+  }
+
+  void _stopMonitoring() {
+    _accelerometerSubscription?.cancel();
+
+    setState(() {
+      isMonitoring = false;
+      dangerDetected = false;
+      motionScore = 0.0;
+      motionStatus = "Monitoring stopped";
     });
   }
 
   void _showDangerPrompt() {
+    _dialogShowing = true;
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.cardBackground,
         title: const Text(
@@ -64,13 +105,16 @@ class _MotionDetectionScreenState
           style: TextStyle(color: Colors.white),
         ),
         content: const Text(
-          "We detected sudden movement. Are you safe?",
+          "Sudden movement detected. Are you safe?",
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
+
+              _dialogShowing = false;
+
               setState(() {
                 dangerDetected = false;
                 motionStatus = "User confirmed safe";
@@ -87,6 +131,9 @@ class _MotionDetectionScreenState
             ),
             onPressed: () {
               Navigator.pop(context);
+
+              _dialogShowing = false;
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -103,7 +150,7 @@ class _MotionDetectionScreenState
 
   @override
   void dispose() {
-    _demoTimer?.cancel();
+    _accelerometerSubscription?.cancel();
     super.dispose();
   }
 
@@ -120,7 +167,6 @@ class _MotionDetectionScreenState
           children: [
             const SizedBox(height: 20),
 
-            // Main Motion Icon
             Container(
               height: 180,
               width: 180,
@@ -134,8 +180,8 @@ class _MotionDetectionScreenState
                 boxShadow: [
                   BoxShadow(
                     color: (dangerDetected
-                        ? Colors.red
-                        : Colors.green)
+                            ? Colors.red
+                            : Colors.green)
                         .withValues(alpha: 0.4),
                     blurRadius: 20,
                     spreadRadius: 5,
@@ -156,12 +202,20 @@ class _MotionDetectionScreenState
               subtitle: motionStatus,
               icon: Icons.speed,
               iconColor:
-              dangerDetected ? Colors.red : Colors.green,
+                  dangerDetected ? Colors.red : Colors.green,
+            ),
+
+            const SizedBox(height: 16),
+
+            EmergencyCard(
+              title: "Motion Score",
+              subtitle: motionScore.toStringAsFixed(2),
+              icon: Icons.analytics,
+              iconColor: Colors.orange,
             ),
 
             const SizedBox(height: 25),
 
-            // Sensitivity Slider
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -169,7 +223,8 @@ class _MotionDetectionScreenState
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   const Text(
                     "Detection Sensitivity",
@@ -201,7 +256,7 @@ class _MotionDetectionScreenState
                   ? Icons.pause
                   : Icons.play_arrow,
               backgroundColor:
-              isMonitoring ? Colors.grey : Colors.red,
+                  isMonitoring ? Colors.grey : Colors.red,
               onPressed: _toggleMonitoring,
             ),
           ],
